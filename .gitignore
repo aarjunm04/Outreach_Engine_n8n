@@ -9,8 +9,9 @@ __pycache__/
 venv/
 .env/
 .venv/
-env/
+.env/
 ENV/
+
 
 # OS / editor
 .DS_Store
@@ -32,3 +33,4 @@ data/*.parquet
 # Ignore settings file
 settings.yaml
 
+.env
