@@ -1,0 +1,87 @@
+scraping:
+  serpapi_key: 
+  monthly_budget: 100
+  concurrent_workers: 4
+  requests_per_second: 0.5
+  page_timeout: 30
+  max_retries: 3
+  retry_backoff_factor: 2.0
+  pages_per_query: 1
+  results_per_page: 10
+  use_proxies: true
+  proxies:
+  - Proxy no.1 
+  - Proxy no.2
+  proxy_rotation: round_robin
+  queries_file: config/queries.yaml
+  output_csv: data/scraper_output.csv
+  dedupe_against_sheet: true
+  dedupe_output_csv: data/deduplicated.csv
+enrichment:
+  api_keys:
+  - key: key_no.1   
+    credits: 50
+    status: active
+  - key: key_no.2
+    credits: 50
+    status: active
+  - key: key_no.3
+    credits: 50
+    status: active
+  - key: key_no.4
+    credits: 50
+    status: active
+  monthly_email_cap: 25
+  api_endpoint: https://api.hunter.io/v2/email-finder
+  email_confidence_threshold: 75
+  request_timeout: 30
+  key_rotation: least_used
+  required_fields:
+  - first_name
+  - last_name
+  - domain
+  email_validation: true
+  blacklist_domains:
+  - gmail.com
+  - yahoo.com
+  - hotmail.com
+  - outlook.com
+  - temp-mail.org
+  output_csv: data/enriched_with_emails.csv
+google_sheets:
+  webhook_url: google_sheets_webhook_endpoint
+  sheet_id: your_google_sheet_id
+  sheet_name: Outreach Engine
+  append_mode: true
+  dedupe_by:
+  - email
+  - first_name
+  - last_name
+  request_timeout: 30
+  input_csv: data/enriched_with_emails.csv
+monthly_run:
+  day_of_month: 15
+  execution_time: 02:00
+  manual_trigger: true
+  log_level: INFO
+  save_logs: false
+  notify_on_error: false
+  notification_email: your_email_here
+opal:
+  enabled: false
+  webhook_url: ''
+  trigger_on: sheet_append
+data:
+  keep_intermediate_csv: true
+  keep_days: 90
+  sheet_retention: forever
+  data_directory: data
+  monthly_subdirs: true
+system:
+  app_name: Outreach Engine
+  version: 1.0.0
+  environment: production
+  encoding: utf-8
+  timezone: UTC
+  debug: false
+  temp_directory: /tmp
