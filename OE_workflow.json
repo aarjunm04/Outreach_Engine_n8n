@@ -1,0 +1,422 @@
+{
+  "name": "OutreachEngineTemplate",
+  "nodes": [
+    {
+      "id": "google-sheets-trigger-1",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [-1152, 112],
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "custom",
+              "cronExpression": "0 13 8-14 * 3"
+            }
+          ]
+        },
+        "documentId": {
+          "mode": "list",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "mode": "list",
+          "value": "Sheet1"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "YOUR_GOOGLESHEETS_TRIGGER_CRED_ID",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "id": "read-pending-leads-1",
+      "name": "Read Pending Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [-928, 112],
+      "parameters": {
+        "operation": "lookup",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "STATUS",
+              "lookupValue": "Pending"
+            }
+          ]
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLESHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "id": "filter-cap-1",
+      "name": "FilterCap",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, 112],
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "const items = $input.all();\nconst out = [];\n\nfor (let i = 0; i < items.length && out.length < 200; i++) {\n  const row = items[i].json;\n  if ((row.STATUS || row.status) === 'Pending') {\n    out.push(items[i]);\n  }\n}\n\nreturn out;"
+      }
+    },
+    {
+      "id": "profilestore-1",
+      "name": "Profilestore",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-464, 112],
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "const items = $input.all();\n\nconst profileVersion = \"v1.0.0\";\n\nconst profile = {\n  version: profileVersion,\n  personal: {\n    fullName: \"Your Name\",\n    headline: \"Software Engineer specializing in AI, Machine Learning, and automation systems.\",\n    currentStatus: \"Your current role or education status\",\n    careerGoal: \"High-level career goal text here.\",\n    location: \"City, Country\"\n  },\n  contact: {\n    email: \"you@example.com\",\n    linkedin: \"https://www.linkedin.com/in/your-profile\",\n    github: \"https://github.com/your-handle\",\n    portfolio: \"\",\n    twitter: \"\"\n  },\n  skills: {\n    core: [\n      \"Programming\",\n      \"Machine Learning & Deep Learning\",\n      \"Data Structures & Algorithms\",\n      \"Model evaluation and optimization\",\n      \"End-to-end ML or software pipelines\"\n    ],\n    tools: [\n      \"Scikit-learn\",\n      \"Pandas, NumPy, Matplotlib\",\n      \"TensorFlow or PyTorch\",\n      \"Docker\",\n      \"Git & CI\",\n      \"Jupyter Notebook\",\n      \"PostgreSQL or MongoDB\"\n    ],\n    domains: [\n      \"Applied Machine Learning\",\n      \"Automation & Workflow Orchestration\",\n      \"Fraud / Anomaly Detection\",\n      \"Recommender or Decision Systems\",\n      \"Time-series or Sequence Modeling\"\n    ]\n  },\n  experience: [\n    {\n      title: \"Data / ML Engineer (or Intern)\",\n      company: \"Company Name\",\n      start: \"Start Month Year\",\n      end: \"End Month Year or Present\",\n      highlights: [\n        \"Impact bullet one.\",\n        \"Impact bullet two.\"\n      ]\n    }\n  ],\n  projects: [\n    {\n      name: \"Automation / Agent System\",\n      oneLine: \"End-to-end agent or automation system that runs real workflows.\",\n      stack: [\"Python\", \"n8n\", \"APIs\"],\n      impact: \"Impact description for project 1.\",\n      link: \"https://github.com/your-handle/your-automation-project\"\n    },\n    {\n      name: \"ML Model in Production\",\n      oneLine: \"Production-ready ML pipeline.\",\n      stack: [\"ML library\", \"Serving framework\", \"Monitoring\"],\n      impact: \"Impact description for project 2.\",\n      link: \"https://github.com/your-handle/your-ml-project\"\n    }\n  ],\n  education: [\n    {\n      degree: \"B.Tech / B.Sc. in Computer Science\",\n      institution: \"Your College or University\",\n      start: \"Start Month Year\",\n      end: \"End Month Year\",\n      highlights: [\n        \"Key academic highlight.\",\n        \"Relevant coursework.\"\n      ]\n    }\n  ],\n  signature: {\n    lines: [\n      \"Your Name\",\n      \"Your Title | AI & ML\",\n      \"GitHub: github.com/your-handle | LinkedIn: linkedin.com/in/your-profile\"\n    ]\n  },\n  ctaDefaults: {\n    short: \"Open to a quick 15-minute conversation if there’s an opportunity to collaborate or contribute.\",\n    long: \"I’d love to connect and explore how my background could add value to your team or projects. Happy to jump on a short call at your convenience.\"\n  },\n  templates: {\n    guidance: {\n      label: \"Guidance / Advice\",\n      tone: \"friendly, respectful, curious, student-like, no hard sell\",\n      theme: \"Seek career and skill-building guidance from a senior engineer or leader\",\n      keyPoints: [\n        \"Introduce yourself and focus area.\",\n        \"Reference 1–2 relevant projects.\",\n        \"Ask specific questions about skills or paths.\",\n        \"Keep CTA lightweight.\"\n      ]\n    },\n    collaboration: {\n      label: \"Founder / Startup Outreach\",\n      tone: \"respectful, proactive, value-driven, collaborative\",\n      theme: \"Explore ways to contribute to an early-stage team\",\n      keyPoints: [\n        \"One-line background summary.\",\n        \"Why their product / space interests you.\",\n        \"Hands-on projects showing execution.\",\n        \"Flexible contribution options.\",\n        \"CTA for a short conversation.\"\n      ]\n    },\n    referral: {\n      label: \"Referral / Introduction\",\n      tone: \"professional, polite, confident but non-assumptive\",\n      theme: \"Request referrals or pointers to opportunities\",\n      keyPoints: [\n        \"Who you are and roles you’re exploring.\",\n        \"Mention 1–2 strong projects.\",\n        \"Ask if they’re comfortable referring or pointing to openings.\",\n        \"Keep job titles flexible.\",\n        \"Low-pressure CTA.\"\n      ]\n    },\n    hiring_manager: {\n      label: \"Direct Pitch to Hiring Manager / HR\",\n      tone: \"direct, concise, professional, impact-oriented\",\n      theme: \"Position yourself as a strong candidate\",\n      keyPoints: [\n        \"Clear one-liner about background.\",\n        \"Map skills/projects to typical team needs.\",\n        \"Emphasize concrete results.\",\n        \"Mention attached resume.\",\n        \"Respectful, explicit CTA for consideration or call.\"\n      ]\n    }\n  }\n};\n\nfor (const item of items) {\n  item.json = {\n    ...item.json,\n    profile\n  };\n}\n\nreturn items;"
+      }
+    },
+    {
+      "id": "template-rules-1",
+      "name": "TemplateRules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-240, 112],
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  let row = item.json.row;\n  if (!row) {\n    row = {\n      NAME: item.json.NAME,\n      EMAIL: item.json.EMAIL,\n      ROLE: item.json.ROLE,\n      COMPANY: item.json.COMPANY,\n      SOURCE: item.json.SOURCE,\n      DATE: item.json.DATE,\n      STATUS: item.json.STATUS,\n      NOTES: item.json.NOTES\n    };\n    item.json.row = row;\n  }\n\n  const profile = item.json.profile;\n  const templateCategory = item.json.templateCategory || \"guidance\";\n\n  if (!row) throw new Error(\"Build Email Prompt: row is missing on item.json.row\");\n  if (!profile) throw new Error(\"Build Email Prompt: profile is missing on item.json.profile\");\n\n  const templates = profile.templates || {};\n  const template = templates[templateCategory];\n  if (!template) throw new Error(`Build Email Prompt: Unknown templateCategory '${templateCategory}'`);\n\n  const projects = Array.isArray(profile.projects) ? profile.projects : [];\n  const highlightProjects = projects.slice(0, 2).map(p => ({\n    name: p.name,\n    oneLine: p.oneLine,\n    impact: p.impact,\n    link: p.link\n  }));\n\n  const profileSummaryLines = [\n    `Name: ${profile.personal.fullName}`,\n    `Headline: ${profile.personal.headline}`,\n    `Current status: ${profile.personal.currentStatus}`,\n    `Career goal: ${profile.personal.careerGoal}`,\n    `Location: ${profile.personal.location}`,\n    `Core skills: ${profile.skills.core.join(\", \")}`,\n    `Key domains: ${profile.skills.domains.join(\", \")}`,\n    `Highlight projects: ${highlightProjects.map(p => `${p.name} - ${p.oneLine} (${p.impact})`).join(\" | \")}`\n  ];\n\n  const profileSummary = profileSummaryLines.join(\"\\n\");\n\n  const templateSummaryLines = [\n    `Template category: ${templateCategory}`,\n    `Label: ${template.label}`,\n    `Tone: ${template.tone}`,\n    `Theme: ${template.theme}`,\n    `Key points:`,\n    ...template.keyPoints.map((kp, idx) => `  ${idx + 1}. ${kp}`)\n  ];\n\n  const templateSummary = templateSummaryLines.join(\"\\n\");\n\n  const signatureBlock = profile.signature.lines.join(\"\\n\");\n  const defaultCtaShort = profile.ctaDefaults?.short || \"\";\n\n  const systemText = `You are an expert cold-email writer helping an early-career engineer reach out to professionals and teams.\\n\\nYou MUST follow these constraints:\\n\\n1) Output format:\\n- Return ONLY a strict JSON object with two keys: \"subject\" and \"body\".\\n- Do NOT include code fences, backticks, comments, markdown, or any text outside the JSON.\\n- Write only the email body. Do not include any closing or signature (no 'Best', no name, no links).\\n\\n2) Sender profile (this information is canonical; do not change names, links, or roles):\\n${profileSummary}\\n\\n3) Template rules for this email:\\n${templateSummary}\\n\\n4) Style and structure:\\n- Write concise, human emails (120–180 words in the body).\\n- Use natural language; no bullet lists in the final email body.\\n- No obvious AI markers. No generic fluff or buzzwords.\\n- Personalize to the recipient based on their role, company, and notes.\\n- The email body should ALREADY include a clear CTA aligned with the template rules.\\n\\n5) Signature:\\n- DO NOT invent or modify the sender signature.\\n- DO NOT add a signature block yourself; the system will append the exact signature later.\\n- End the body with a natural closing line, not the name or contact details.`.trim();\n\n  const userText = `You are writing a single cold email to this prospect.\\n\\nProspect JSON (from our CRM/Google Sheet):\\n${JSON.stringify(row, null, 2)}\\n\\nTask:\\n- Using the sender profile and template rules from the system message, craft a highly relevant SUBJECT and BODY.\\n- The core of the body must clearly explain:\\n  - Who the sender is.\\n  - Why the sender could be a strong fit for their work, team, or company.\\n  - 1–2 concrete projects or experiences that demonstrate relevant skills and execution.\\n- Follow the tone, theme, and key points for the selected template category.\\n- Assume the sender’s resume will be attached (you may mention \"attached resume\" once if appropriate).\\n- Do NOT include the sender's name, email, or links in the body; that will be appended separately.\\n\\nRemember:\\n- Return ONLY JSON with \"subject\" and \"body\".`.trim();\n\n  const geminiRequest = {\n    contents: [\n      {\n        role: \"system\",\n        parts: [{ text: systemText }]\n      },\n      {\n        role: \"user\",\n        parts: [{ text: userText }]\n      }\n    ]\n  };\n\n  item.json = {\n    ...item.json,\n    geminiRequest,\n    templateCategory,\n    signatureBlock,\n    defaultCtaShort\n  };\n}\n\nreturn items;"
+      }
+    },
+    {
+      "id": "message-model-1",
+      "name": "Message a model",
+      "type": "n8n-nodes-base.perplexity",
+      "typeVersion": 1,
+      "position": [0, 112],
+      "parameters": {
+        "resource": "message",
+        "messages": {
+          "message": [
+            {
+              "role": "system",
+              "content": "={{$json[\"geminiRequest\"].contents[0].parts[0].text}}"
+            },
+            {
+              "role": "user",
+              "content": "={{$json[\"geminiRequest\"].contents[1].parts[0].text}}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.4,
+          "maxTokens": 512
+        }
+      },
+      "credentials": {
+        "perplexityApi": {
+          "id": "YOUR_PERPLEXITY_CRED_ID",
+          "name": "Perplexity account"
+        }
+      }
+    },
+    {
+      "id": "llm-response-1",
+      "name": "llmResponse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [208, 112],
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  const res = item.json;\n\n  let raw = \"\";\n  try {\n    raw = (res.choices?.[0]?.message?.content || \"\").trim();\n  } catch (e) {\n    raw = \"\";\n  }\n\n  if (!raw) {\n    throw new Error(\"llmResponse: Missing content in model response.\");\n  }\n\n  let parsed;\n  try {\n    parsed = JSON.parse(raw);\n  } catch (e) {\n    throw new Error(\"llmResponse: Failed to parse JSON from model content: \" + raw);\n  }\n\n  if (typeof parsed !== \"object\" || parsed === null) {\n    throw new Error(\"llmResponse: Parsed content is not a JSON object.\");\n  }\n\n  let subject = (parsed.subject || \"\").toString().trim();\n  let body = (parsed.body || \"\").toString().trim();\n\n  if (!subject || !body) {\n    throw new Error(\"llmResponse: Parsed JSON missing non-empty 'subject' or 'body'.\");\n  }\n\n  body = body.replace(/\\r\\n/g, \"\\n\").trim();\n\n  const row = item.json.row || {};\n  const profile = item.json.profile || {};\n  const templateCategory = item.json.templateCategory || \"guidance\";\n  const signatureBlock = item.json.signatureBlock || \"\";\n  const defaultCtaShort = item.json.defaultCtaShort || \"\";\n\n  item.json = {\n    subject,\n    body,\n    template_id: templateCategory,\n    row,\n    profile,\n    signatureBlock,\n    defaultCtaShort,\n    raw_completion: raw\n  };\n}\n\nreturn items;"
+      }
+    },
+    {
+      "id": "add-signature-1",
+      "name": "Addsignature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [384, 112],
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  let body = item.json.body || \"\";\n\n  body = body.replace(/\\n+(Best|Best regards|Regards|Sincerely)[\\s\\S]*$/i, \"\");\n  body = body.replace(/\\s+$/g, \"\");\n\n  const signature = \"\\n\\nBest,\\nYour Name\\nYour Title | AI & ML\\nGitHub: github.com/your-handle | LinkedIn: linkedin.com/in/your-profile\";\n\n  item.json.body = body + signature;\n}\n\nreturn items;"
+      }
+    },
+    {
+      "id": "qa-check-1",
+      "name": "QA Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [608, 112],
+      "parameters": {
+        "language": "JavaScript",
+        "jsCode": "const items = $input.all();\n\nfor (const item of items) {\n  const data = item.json;\n  const subject = (data.subject || \"\").trim();\n  const body = (data.body || \"\").trim();\n\n  let approved = true;\n  let reason = \"\";\n\n  if (!subject || !body) {\n    approved = false;\n    reason = \"Missing subject or body from model.\";\n  } else if (body.length > 2500) {\n    approved = false;\n    reason = \"Email body too long; likely hallucinated.\";\n  }\n\n  item.json = {\n    ...data,\n    approved,\n    reason\n  };\n}\n\nreturn items;"
+      }
+    },
+    {
+      "id": "if-approved-1",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [832, 112],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"approved\"]}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "is"
+              }
+            }
+          ],
+          "options": {
+            "combinator": "and"
+          }
+        }
+      }
+    },
+    {
+      "id": "download-file-1",
+      "name": "Download file",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1104, 96],
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "mode": "id",
+          "value": "YOUR_RESUME_FILE_ID"
+        },
+        "options": {
+          "binaryPropertyName": "resume"
+        }
+      },
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLEDRIVE_CRED_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "id": "send-email-1",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [1328, 96],
+      "parameters": {
+        "resource": "message",
+        "subject": "={{$json[\"subject\"]}}",
+        "message": "={{$json[\"body\"]}}",
+        "toList": "={{$json[\"EMAIL\"]}}",
+        "additionalFields": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "resume"
+              }
+            ]
+          }
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CRED_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "id": "mark-sent-1",
+      "name": "Mark Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [1488, 96],
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "mode": "id",
+          "value": "YOUR_SHEET_ID"
+        },
+        "sheetName": {
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "updateKey": "EMAIL",
+        "value": "={{$json[\"EMAIL\"]}}",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "STATUS",
+              "fieldValue": "Sent"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLESHEETS_CRED_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Pending Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Pending Leads": {
+      "main": [
+        [
+          {
+            "node": "FilterCap",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterCap": {
+      "main": [
+        [
+          {
+            "node": "Profilestore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Profilestore": {
+      "main": [
+        [
+          {
+            "node": "TemplateRules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TemplateRules": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "llmResponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "llmResponse": {
+      "main": [
+        [
+          {
+            "node": "Addsignature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Addsignature": {
+      "main": [
+        [
+          {
+            "node": "QA Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "QA Check": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Mark Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "OutreachEngineTemplateId",
+  "tags": []
+}

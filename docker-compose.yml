@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  n8n_outreach:
+    image: n8nio/n8n:latest
+    container_name: n8n_outreach
+    restart: unless-stopped
+
+    # Web UI port
+    ports:
+      - "5680:5678"
+
+    # Environment & secrets (keep most in .env)
+    env_file:
+      - .env
+
+    environment:
+      - GENERIC_TIMEZONE=Asia/Kolkata
+      - NODE_ENV=production
+      # If you use reverse proxy with HTTPS, set:
+      # - N8N_PROTOCOL=https
+      # - N8N_HOST=outreach.yourdomain.com
+      # - N8N_PORT=443
+      # - WEBHOOK_URL=https://outreach.yourdomain.com/
+
+    volumes:
+      - n8n_outreach_data:/home/node/.n8n
+
+    # Optional: give it a specific network if you have other stacks
+    networks:
+      - n8n_outreach_net
+
+volumes:
+  n8n_outreach_data:
+
+networks:
+  n8n_outreach_net:
+    driver: bridge
