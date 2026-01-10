@@ -315,4 +315,3 @@ Roadmap
 - Repo: `aarjunm04/Outreach_Engine_n8n`
 - Description: Cold email automation using Perplexity AI and n8n — completely autonomous
 
-If you want, I can prepare a git patch that replaces the current `README.md` with this file and confirms `OE_workflow.png` is referenced correctly. Would you like that patch, or do you want me to open a PR?
