@@ -1,73 +1,84 @@
 queries:
 
-    # # ============================
-    # # 1. Senior / Staff / Principal ML & AI Engineers
-    # # ============================
-      - "site:linkedin.com/in/ (\"Senior Machine Learning Engineer\" OR \"Senior ML Engineer\" OR \"Senior AI Engineer\")"
-      - "site:linkedin.com/in/ (\"Staff Machine Learning Engineer\" OR \"Staff ML Engineer\" OR \"Staff AI Engineer\")"
-      - "site:linkedin.com/in/ (\"Principal Machine Learning Engineer\" OR \"Principal AI Engineer\" OR \"Principal ML Engineer\")"
-      - "site:linkedin.com/in/ (\"Lead Machine Learning Engineer\" OR \"Lead AI Engineer\" OR \"Lead ML Engineer\")"
-      - "site:linkedin.com/in/ (\"Machine Learning Engineer\" AND \"AI\")"
-    #
-    # # ============================
-    # # 2. Applied Scientist / Research Scientist
-    # # ============================
-      - "site:linkedin.com/in/ (\"Applied Scientist\" AND (\"AI\" OR \"ML\" OR \"Machine Learning\"))"
-      - "site:linkedin.com/in/ (\"Research Scientist\" AND (\"Machine Learning\" OR \"Artificial Intelligence\"))"
-      - "site:linkedin.com/in/ (\"Deep Learning Engineer\" OR \"Deep Learning Researcher\")"
-      - "site:linkedin.com/in/ (\"NLP Engineer\" OR \"Natural Language Processing Engineer\")"
-      - "site:linkedin.com/in/ (\"Computer Vision Engineer\" OR \"CV Engineer\")"
-    #
-    # # ============================
-    # # 3. Directors / VP / Heads (Leadership AI Roles)
-    # # ============================
-      - "site:linkedin.com/in/ (\"Director\" AND (\"AI\" OR \"Machine Learning\" OR \"Data Science\"))"
-      - "site:linkedin.com/in/ (\"VP\" AND (\"AI\" OR \"ML\" OR \"Data Science\"))"
-    # - "site:linkedin.com/in/ (\"AI Manager\" OR \"ML Manager\" OR \"Data Science Manager\")"
-    #
-    # # ============================
-    # # 4. Founders, CEOs, CTOs, Startup Leaders in AI
-    # # ============================
-    # - "site:linkedin.com/in/ (\"Founder\" AND (\"AI\" OR \"ML\" OR \"Machine Learning\"))"
-    # - "site:linkedin.com/in/ (\"Co-Founder\" AND (\"AI\" OR \"ML\" OR \"Machine Learning\"))"
-    # - "site:linkedin.com/in/ (\"CEO\" AND (\"AI\" OR \"ML\"))"
-    # - "site:linkedin.com/in/ (\"CTO\" AND (\"AI\" OR \"ML\"))"
-    # - "site:linkedin.com/in/ (\"Startup Founder\" AND (\"AI\" OR \"Tech\"))"
-    #
-    # # ============================
-    # # 5. Product + AI Hybrid Roles (High-quality outreach)
-    # # ============================
-    # - "site:linkedin.com/in/ (\"AI Product Manager\" OR \"ML Product Manager\" OR \"Product Lead AI\")"
-    # - "site:linkedin.com/in/ (\"Technical Product Manager\" AND (\"AI\" OR \"ML\"))"
-    # - "site:linkedin.com/in/ (\"AI Program Manager\" OR \"ML Program Manager\")"
-    #
-    # # ============================
-    # # 6. Engineers transitioning into AI (broad high-quality pool)
-    # # ============================
-    # - "site:linkedin.com/in/ (\"Software Engineer\" AND (\"AI\" OR \"ML\" OR \"Machine Learning\"))"
-    # - "site:linkedin.com/in/ (\"Full Stack Engineer\" AND (\"Machine Learning\" OR \"AI\"))"
-    # - "site:linkedin.com/in/ (\"Backend Engineer\" AND (\"ML\" OR \"AI\"))"
-    # - "site:linkedin.com/in/ (\"Python Engineer\" AND (\"ML\" OR \"AI\"))"
-    #
-    # # ============================
-    # # 7. Recruiters / Talent Acquisition (AI + Tech)
-    # # ============================
-    # - "site:linkedin.com/in/ (\"Technical Recruiter\" AND (\"AI\" OR \"ML\" OR \"Data Science\"))"
-    # - "site:linkedin.com/in/ (\"Talent Acquisition\" AND (\"AI\" OR \"Machine Learning\"))"
-    # - "site:linkedin.com/in/ (\"Recruiting Lead\" AND (\"Tech\" OR \"AI\" OR \"ML\"))"
-    # - "site:linkedin.com/in/ (\"Head of Talent\" AND (\"Software\" OR \"AI\" OR \"ML\"))"
-    # - "site:linkedin.com/in/ (\"University Recruiter\" AND (\"Software\" OR \"Data\" OR \"AI\"))"
-    #
-    # # ============================
-    # # 8. AI Startups & Investors (high signal)
-    # # ============================
-    # - "site:linkedin.com/in/ (\"Angel Investor\" AND (\"AI\" OR \"Tech\"))"
-    # - "site:linkedin.com/in/ (\"Venture Partner\" AND (\"AI\" OR \"ML\"))"
-    # - "site:linkedin.com/in/ (\"VC\" AND (\"AI\" OR \"ML\"))"
-    #
-    # # ============================
-    # # 9. General catch-all AI leadership search
-    # # ============================
-    # - "site:linkedin.com/in/ (\"Machine Learning\" AND \"Engineer\")"
-    # - "site:linkedin.com/in/ (\"Data Scientist\" AND \"Machine Learning\")"
-    # - "site:linkedin.com/in/ (\"Artificial Intelligence\" AND \"Engineer\")"
+  # ============================
+  # 1. HR Leaders & Directors (High-priority hiring decision makers)
+  # ============================
+  - "site:linkedin.com/in/ (\"HR Director\" OR \"Head of HR\" OR \"VP HR\" OR \"Chief Human Resources Officer\")"
+  - "site:linkedin.com/in/ (\"HR Manager\" OR \"Human Resources Manager\" OR \"HR Business Partner\")"
+  - "site:linkedin.com/in/ (\"Director People Operations\" OR \"Head of People\" OR \"VP People\")"
+  - "site:linkedin.com/in/ (\"Talent Director\" OR \"Head of Talent\" OR \"VP Talent\")"
+  - "site:linkedin.com/in/ (\"Chief People Officer\" OR \"CPO\" OR \"SVP HR\")"
+
+  # ============================
+  # 2. Recruiters & Talent Acquisition Specialists (Core hiring gatekeepers)
+  # ============================
+  - "site:linkedin.com/in/ (\"Technical Recruiter\" OR \"Tech Recruiter\" OR \"IT Recruiter\")"
+  - "site:linkedin.com/in/ (\"Senior Recruiter\" OR \"Lead Recruiter\" OR \"Principal Recruiter\")"
+  - "site:linkedin.com/in/ (\"Talent Acquisition Manager\" OR \"Recruiting Manager\" OR \"TA Manager\")"
+  - "site:linkedin.com/in/ (\"Executive Recruiter\" OR \"C-level Recruiter\" OR \"Leadership Recruiter\")"
+  - "site:linkedin.com/in/ (\"Contract Recruiter\" OR \"Contracting Manager\" OR \"Staffing Manager\")"
+  - "site:linkedin.com/in/ (\"University Recruiter\" OR \"Campus Recruiter\" OR \"Early Career Recruiter\")"
+
+  # ============================
+  # 3. Hiring Managers & Team Leads (Direct job posters & interviewers)
+  # ============================
+  - "site:linkedin.com/in/ (\"Hiring Manager\" OR \"We're Hiring\" OR \"Now Hiring\")"
+  - "site:linkedin.com/in/ (\"Engineering Manager\" OR \"Software Engineering Manager\" OR \"EM\")"
+  - "site:linkedin.com/in/ (\"Engineering Lead\" OR \"Tech Lead\" OR \"Team Lead Engineering\")"
+  - "site:linkedin.com/in/ (\"Product Manager\" OR \"Technical Product Manager\" OR \"PM\")"
+  - "site:linkedin.com/in/ (\"Data Science Manager\" OR \"ML Manager\" OR \"AI Manager\")"
+
+  # ============================
+  # 4. Department Heads & VPs (Budget owners & final decision makers)
+  # ============================
+  - "site:linkedin.com/in/ (\"VP Engineering\" OR \"Vice President Engineering\" OR \"VPE\")"
+  - "site:linkedin.com/in/ (\"Director Engineering\" OR \"Director of Engineering\" OR \"Engineering Director\")"
+  - "site:linkedin.com/in/ (\"Head of Engineering\" OR \"Engineering Head\" OR \"Eng Director\")"
+  - "site:linkedin.com/in/ (\"VP Product\" OR \"Director Product\" OR \"Head of Product\")"
+  - "site:linkedin.com/in/ (\"CTO\" OR \"Chief Technology Officer\" OR \"VP Technology\")"
+
+  # ============================
+  # 5. CEOs & Founders (Startup hiring - high response potential)
+  # ============================
+  - "site:linkedin.com/in/ (\"CEO\" OR \"Chief Executive Officer\" OR \"Founder CEO\")"
+  - "site:linkedin.com/in/ (\"Co-Founder\" OR \"Co-founder\" OR \"Startup Founder\")"
+  - "site:linkedin.com/in/ (\"Founder\" AND (\"hiring\" OR \"we're hiring\" OR \"now hiring\"))"
+  - "site:linkedin.com/in/ (\"Serial Entrepreneur\" OR \"Startup CEO\" OR \"Founder & CEO\")"
+
+  # ============================
+  # 6. High-ROI Niche Recruiters (Specialized high-conversion)
+  # ============================
+  - "site:linkedin.com/in/ (\"AI Recruiter\" OR \"Machine Learning Recruiter\" OR \"ML Recruiter\")"
+  - "site:linkedin.com/in/ (\"Data Science Recruiter\" OR \"Data Engineer Recruiter\")"
+  - "site:linkedin.com/in/ (\"Python Recruiter\" OR \"Full Stack Recruiter\" OR \"DevOps Recruiter\")"
+  - "site:linkedin.com/in/ (\"Remote Recruiter\" OR \"Work from Home Recruiter\" OR \"Distributed Team Recruiter\")"
+
+  # ============================
+  # 7. Active Job Posters (Real-time hiring signals)
+  # ============================
+  - "site:linkedin.com/in/ (\"hiring\" AND \"engineer\")"
+  - "site:linkedin.com/in/ (\"now hiring\" OR \"we're hiring\" OR \"join our team\")"
+  - "site:linkedin.com/in/ (\"looking for\" AND (\"developer\" OR \"engineer\" OR \"data\"))"
+  - "site:linkedin.com/in/ (\"open positions\" OR \"job openings\" OR \"careers\")"
+
+  # ============================
+  # 8. Location-Specific High-Value Targets (Nagpur + India-wide)
+  # ============================
+  - "site:linkedin.com/in/ (\"HR\" OR \"Recruiter\" OR \"Hiring\") Nagpur"
+  - "site:linkedin.com/in/ (\"Engineering Manager\" OR \"Tech Lead\") (Nagpur OR Maharashtra)"
+  - "site:linkedin.com/in/ (\"VP Engineering\" OR \"Director Engineering\") India"
+  - "site:linkedin.com/in/ (\"Technical Recruiter\" OR \"Talent Acquisition\") (Pune OR Bangalore OR Mumbai OR Hyderabad)"
+
+  # ============================
+  # 9. Agency Recruiters & Headhunters (Volume + referral networks)
+  # ============================
+  - "site:linkedin.com/in/ (\"Recruitment Consultant\" OR \"Recruitment Specialist\" OR \"Search Consultant\")"
+  - "site:linkedin.com/in/ (\"Staffing Agency\" OR \"Recruitment Agency\" OR \"Executive Search\")"
+  - "site:linkedin.com/in/ (\"RPO Manager\" OR \"Recruitment Process Outsourcing\")"
+
+  # ============================
+  # 10. Emerging Leaders (High promotion potential + referral power)
+  # ============================
+  - "site:linkedin.com/in/ (\"Senior Engineer\" OR \"Staff Engineer\" OR \"Principal Engineer\")"
+  - "site:linkedin.com/in/ (\"Engineering Manager\" OR \"Tech Lead\" OR \"Team Lead\") (promoted OR promotion)"
+  
