@@ -16,7 +16,7 @@ Google Sheets Sync v2 (Apps Script WebApp)
 import json
 import time
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 import pandas as pd
 import requests
@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
 DATA_DIR = PROJECT_ROOT / "data"
 
-INPUT_CSV = DATA_DIR / "enriched_with_emails.csv"  # pipeline output
+INPUT_CSV = DATA_DIR / "enriched_with_emails.csv"  # default pipeline output
 
 BATCH_SIZE = 50
 POST_TIMEOUT = 20
@@ -54,36 +54,31 @@ WORKFLOW_OWNED = {"STATUS", "TEMPLATE USED"}
 
 
 class SheetSync:
-    def __init__(self, webhook_post: str, webhook_get: Optional[str] = None) -> None:
-        self.webhook_post = webhook_post
-        self.webhook_get = webhook_get
+    def __init__(self, webhook_url: str) -> None:
+        self.webhook_url = webhook_url
         self.session = requests.Session()
-        logger.info("[SheetSync] Initialized (POST webhook configured)")
-        if self.webhook_get:
-            logger.info("[SheetSync] GET webhook enabled for upsert/dedupe")
+        logger.info("[SheetSync] Initialized (single webhook_url for POST/GET)")
 
     # ------------------------------------------------------------------
     # Load local CSV and map to sheet schema
     # ------------------------------------------------------------------
-    def _load_local_rows(self) -> pd.DataFrame:
-        if not INPUT_CSV.exists():
-            logger.error(f"[SheetSync] {INPUT_CSV} not found")
+    def _load_local_rows(self, csv_path: Path | None = None) -> pd.DataFrame:
+        path = csv_path or INPUT_CSV
+        if not path.exists():
+            logger.error(f"[SheetSync] {path} not found")
             return pd.DataFrame()
 
-        df = pd.read_csv(INPUT_CSV, dtype=str).fillna("")
-        logger.info(f"[SheetSync] Loaded {len(df)} rows from {INPUT_CSV}")
+        df = pd.read_csv(path, dtype=str).fillna("")
+        logger.info(f"[SheetSync] Loaded {len(df)} rows from {path}")
 
-        # Expect columns from enrichment: first_name, last_name, job_title, company,
-        # domain, linkedin_url, email, source, date (adjust if your CSV differs).
-        # Map to the sheet schema.
-        def build_name(row):
+        def build_name(row: Dict[str, Any]) -> str:
             first = str(row.get("first_name", "")).strip()
             last = str(row.get("last_name", "")).strip()
             if first or last:
                 return f"{first} {last}".strip()
             return str(row.get("name", "")).strip()
 
-        def build_notes(row):
+        def build_notes(row: Dict[str, Any]) -> str:
             # Use LinkedIn URL as NOTES
             return str(row.get("linkedin_url", "")).strip()
 
@@ -97,12 +92,13 @@ class SheetSync:
             rec["ROLE"] = str(row.get("job_title", "")).strip()
             rec["COMPANY"] = str(row.get("company", "")).strip()
             rec["SOURCE"] = str(row.get("source", "Hunter.io")).strip() or "Hunter.io"
-            rec["DATE"] = str(row.get("date", pd.Timestamp.utcnow().isoformat())).strip()
+            rec["DATE"] = str(
+                row.get("date", pd.Timestamp.utcnow().isoformat())
+            ).strip()
             rec["STATUS"] = "Pending"  # default for new leads
             rec["TEMPLATE USED"] = ""  # workflow will fill later
             rec["NOTES"] = build_notes(row)
 
-            # Ensure all keys exist
             for col in SHEET_COLUMNS:
                 rec.setdefault(col, "")
 
@@ -113,29 +109,38 @@ class SheetSync:
         return df_sheet
 
     # ------------------------------------------------------------------
-    # Fetch existing rows from Sheet
+    # Fetch existing rows from Sheet (single webhook_url for GET)
     # ------------------------------------------------------------------
     def _fetch_existing(self) -> pd.DataFrame:
-        if not self.webhook_get:
-            logger.warning("[SheetSync] No GET URL configured, skipping upsert")
+        """Fetch existing rows from Google Sheets via the same webhook URL.
+
+        Apps Script doGet(e) should return:
+        { "status": "ok", "data": [ { "NAME": "...", "EMAIL": "...", ... }, ... ] }
+        """
+        if not self.webhook_url:
+            logger.warning(
+                "[SheetSync] No webhook_url configured, skipping existing-row fetch"
+            )
             return pd.DataFrame()
 
         try:
-            r = self.session.get(self.webhook_get, timeout=POST_TIMEOUT)
+            r = self.session.get(self.webhook_url, timeout=POST_TIMEOUT)
             if r.status_code != 200:
-                logger.warning(f"[SheetSync] GET returned {r.status_code}")
+                logger.warning(
+                    f"[SheetSync] GET {self.webhook_url} returned {r.status_code}"
+                )
                 return pd.DataFrame()
 
             data = r.json()
-            # Apps Script should return list of row dicts with same headers
             if isinstance(data, dict) and "data" in data:
                 data = data["data"]
 
             df = pd.DataFrame(data, dtype=str).fillna("")
             logger.info(f"[SheetSync] Sheet currently has {len(df)} existing rows")
             return df
+
         except Exception as e:
-            logger.error(f"[SheetSync] GET failed: {e}")
+            logger.error(f"[SheetSync] GET to webhook_url failed: {e}")
             return pd.DataFrame()
 
     # ------------------------------------------------------------------
@@ -144,21 +149,22 @@ class SheetSync:
     def _compute_changes(
         self, df_local: pd.DataFrame, df_sheet: pd.DataFrame
     ) -> List[Dict[str, Any]]:
-        # Build email → existing row map
         if df_sheet.empty:
             logger.info("[SheetSync] Sheet empty — all rows are new inserts")
-            # All will be inserts; just return local rows
             return df_local.to_dict(orient="records")
 
-        df_sheet["email_norm"] = (
-            df_sheet.get("EMAIL", "").astype(str).str.strip().str.lower()
+        sheet = df_sheet.copy()
+        local = df_local.copy()
+
+        sheet["email_norm"] = (
+            sheet.get("EMAIL", "").astype(str).str.strip().str.lower()
         )
-        df_local["email_norm"] = (
-            df_local.get("EMAIL", "").astype(str).str.strip().str.lower()
+        local["email_norm"] = (
+            local.get("EMAIL", "").astype(str).str.strip().str.lower()
         )
 
         existing_by_email: Dict[str, Dict[str, Any]] = {}
-        for _, r in df_sheet.iterrows():
+        for _, r in sheet.iterrows():
             email = r.get("email_norm", "")
             if email:
                 existing_by_email[email] = r.to_dict()
@@ -166,33 +172,27 @@ class SheetSync:
         changes: List[Dict[str, Any]] = []
         inserts, updates = 0, 0
 
-        for _, r in df_local.iterrows():
-            local = r.to_dict()
-            email_norm = local.get("email_norm", "")
+        for _, r in local.iterrows():
+            row = r.to_dict()
+            email_norm = row.get("email_norm", "")
             if not email_norm:
-                # No email → treat as pure insert
-                changes.append({k: local.get(k, "") for k in SHEET_COLUMNS})
+                changes.append({k: row.get(k, "") for k in SHEET_COLUMNS})
                 inserts += 1
                 continue
 
             if email_norm not in existing_by_email:
-                # New email → insert full row
-                changes.append({k: local.get(k, "") for k in SHEET_COLUMNS})
+                changes.append({k: row.get(k, "") for k in SHEET_COLUMNS})
                 inserts += 1
             else:
-                # Existing email → upsert: keep workflow-owned fields from sheet
                 existing = existing_by_email[email_norm]
                 merged: Dict[str, Any] = {}
                 for col in SHEET_COLUMNS:
                     if col in WORKFLOW_OWNED:
-                        # Keep sheet value
                         merged[col] = existing.get(col, "")
                     elif col in BACKEND_OWNED:
-                        # Overwrite with latest backend value
-                        merged[col] = local.get(col, "")
+                        merged[col] = row.get(col, "")
                     else:
-                        # Fallback: prefer local
-                        merged[col] = local.get(col, existing.get(col, ""))
+                        merged[col] = row.get(col, existing.get(col, ""))
                 changes.append(merged)
                 updates += 1
 
@@ -212,7 +212,7 @@ class SheetSync:
         for attempt in range(1, RETRIES + 1):
             try:
                 r = self.session.post(
-                    self.webhook_post,
+                    self.webhook_url,
                     data=payload,
                     headers={"Content-Type": "application/json"},
                     timeout=POST_TIMEOUT,
@@ -226,11 +226,12 @@ class SheetSync:
                     try:
                         body = r.json()
                     except Exception:
-                        pass
+                        body = {}
 
                     if isinstance(body, dict) and body.get("status") == "error":
                         logger.warning(
-                            f"[SheetSync] Apps Script logical error: {body.get('message')}"
+                            f"[SheetSync] Apps Script logical error: "
+                            f"{body.get('message')}"
                         )
                     else:
                         logger.info(f"[SheetSync] Batch ({len(batch)}) synced")
@@ -245,12 +246,14 @@ class SheetSync:
     # ------------------------------------------------------------------
     # Public sync runner
     # ------------------------------------------------------------------
-    def sync(self) -> int:
+    def sync(self, csv_path: str | None = None) -> int:
         logger.info("=" * 80)
         logger.info("🚀 [SheetSync] Starting sheet sync v2")
         logger.info("=" * 80)
 
-        df_local = self._load_local_rows()
+        df_local = self._load_local_rows(
+            Path(csv_path) if csv_path is not None else None
+        )
         if df_local.empty:
             logger.warning("[SheetSync] No local rows to sync")
             return 0
@@ -270,3 +273,4 @@ class SheetSync:
 
         logger.info(f"[SheetSync] Sync complete. Total rows sent: {sent}")
         return sent
+
