@@ -1,8 +1,10 @@
 # ============================================================================
 # src/enrichment.py - Production-Ready Email Enrichment with Hunter.io
 # ============================================================================
+
 """
 Hunter.io-based email enrichment engine with:
+
 - Multi-key rotation (uses least-used key first)
 - Monthly email cap (200 by default, configurable)
 - Email confidence filtering (50%+ by default)
@@ -13,7 +15,14 @@ Hunter.io-based email enrichment engine with:
 - Auto-creates CSV files if missing
 - CSV preservation (doesn't delete existing data)
 
+New Key Management Logic:
+- When a key hits rate limit (429), skip it for the next 10 email verifications
+- If a key fails more than 3 times in the session, discard it permanently
+- Track consecutive failures across all keys
+- If all keys fail for 10 consecutive email searches, stop enrichment
+
 Flow:
+
 1. Load scraped profiles from data/scraper_output.csv
 2. Initialize Hunter.io client with API key rotation
 3. Validate names and domains BEFORE API calls
@@ -31,7 +40,6 @@ import requests
 import yaml
 from loguru import logger
 
-
 # ============================================================================
 # Configuration Loading
 # ============================================================================
@@ -45,7 +53,7 @@ def load_config() -> Dict[str, Any]:
 
 
 # ============================================================================
-# Hunter.io API Client with Key Rotation
+# Hunter.io API Client with Advanced Key Rotation
 # ============================================================================
 
 
@@ -54,9 +62,11 @@ class HunterClient:
     Hunter.io email finder API client with intelligent key rotation.
 
     Features:
+
     - Automatically rotates between multiple API keys
     - Uses least-used key first (preserves credits)
-    - Respects rate limiting (rotates on 429)
+    - Respects rate limiting with temporary cool-offs (10 email verifications)
+    - Discards keys after 3 failures in a session
     - Validates domain format (must have TLD)
     - Validates last name (must be 2+ characters, not single letter)
     - Filters by confidence threshold
@@ -67,9 +77,18 @@ class HunterClient:
 
     # Disposable email providers to skip
     DISPOSABLE_DOMAINS = {
-        "wizard.com", "tempmail.com", "guerrillamail.com", "mailinator.com",
-        "10minutemail.com", "throwaway.email", "fakeinbox.com", "temp-mail.org",
-        "yopmail.com", "maildrop.cc", "trashmail.com", "sharklasers.com",
+        "wizard.com",
+        "tempmail.com",
+        "guerrillamail.com",
+        "mailinator.com",
+        "10minutemail.com",
+        "throwaway.email",
+        "fakeinbox.com",
+        "temp-mail.org",
+        "yopmail.com",
+        "maildrop.cc",
+        "trashmail.com",
+        "sharklasers.com",
     }
 
     def __init__(self, api_keys: List[Dict[str, Any]], config: Dict[str, Any]):
@@ -87,11 +106,19 @@ class HunterClient:
         self.email_confidence_threshold = enr_cfg.get(
             "email_confidence_threshold", 50
         )
+
         self.blacklist_domains = set(enr_cfg.get("blacklist_domains", []))
         # Add disposable domains to blacklist
         self.blacklist_domains.update(self.DISPOSABLE_DOMAINS)
 
         self.request_timeout = enr_cfg.get("request_timeout", 30)
+
+        # Per-session key tracking
+        # key_failures[index]: number of failures for that key
+        # key_cooldowns[index]: attempt counter when key becomes available again
+        self.key_failures: Dict[int, int] = {}
+        self.key_cooldowns: Dict[int, int] = {}
+        self.global_attempt_counter: int = 0  # incremented per email search
 
         logger.info(
             f"[Hunter] Initialized with {len(api_keys)} keys, "
@@ -102,13 +129,10 @@ class HunterClient:
         """Validate last name for Hunter.io API."""
         if not last_name:
             return False
-
         clean_name = last_name.replace(".", "").strip()
-
         if len(clean_name) < 2:
             logger.debug(f"[Hunter] Invalid last name (too short): '{last_name}'")
             return False
-
         return True
 
     def _validate_domain(self, domain: str) -> bool:
@@ -117,7 +141,6 @@ class HunterClient:
             return False
 
         domain = domain.lower().strip()
-
         if "." not in domain:
             logger.debug(f"[Hunter] Invalid domain (no TLD): {domain}")
             return False
@@ -139,24 +162,85 @@ class HunterClient:
     def _get_active_keys_sorted(self) -> List[Tuple[str, int, int]]:
         """
         Return list of active keys sorted by remaining credits desc, then index.
+
         Each item: (key_str, index, credits)
+
+        Filters out:
+        - Keys with status != "active"
+        - Keys currently in cooldown period
+        - Keys that exceeded failure threshold (>3 failures)
         """
         active_keys: List[Tuple[str, int, int]] = []
+
         for i, k in enumerate(self.api_keys):
             if k.get("status") != "active":
                 continue
+
             key_str = k.get("key")
             if not key_str:
                 continue
+
+            # Check if key exceeded failure threshold
+            failures = self.key_failures.get(i, 0)
+            if failures > 3:
+                logger.debug(
+                    f"[Hunter] Key {i + 1} discarded for session "
+                    f"(failures: {failures})"
+                )
+                continue
+
+            # Check if key is in cooldown
+            cooldown_until = self.key_cooldowns.get(i, 0)
+            if self.global_attempt_counter < cooldown_until:
+                logger.debug(
+                    f"[Hunter] Key {i + 1} in cooldown until attempt "
+                    f"{cooldown_until}, current: {self.global_attempt_counter}"
+                )
+                continue
+
             credits = int(k.get("credits") or 0)
             active_keys.append((key_str, i, credits))
 
         if not active_keys:
-            logger.error("[Hunter] No active API keys configured")
+            logger.warning(
+                "[Hunter] No usable API keys (all in cooldown or discarded)"
+            )
             return []
 
+        # Sort by credits (highest first), then by index (lowest first)
         active_keys.sort(key=lambda x: (-x[2], x[1]))
         return active_keys
+
+    def _record_failure(self, key_index: int, is_rate_limit: bool = False) -> None:
+        """
+        Record a failure for a given key.
+
+        Args:
+            key_index: Index of the key in self.api_keys
+            is_rate_limit: If True, set cooldown period (skip next 10 attempts)
+        """
+        self.key_failures[key_index] = self.key_failures.get(key_index, 0) + 1
+        failures = self.key_failures[key_index]
+
+        if is_rate_limit:
+            # Skip this key for the next 10 email verifications
+            self.key_cooldowns[key_index] = self.global_attempt_counter + 10
+            logger.warning(
+                f"[Hunter] Key {key_index + 1} rate limited (429). "
+                f"Skipping until attempt {self.key_cooldowns[key_index]}. "
+                f"Total failures: {failures}"
+            )
+        else:
+            logger.warning(
+                f"[Hunter] Failure recorded for key {key_index + 1}. "
+                f"Total failures this session: {failures}"
+            )
+
+        if failures > 3:
+            logger.error(
+                f"[Hunter] ❌ Key {key_index + 1} exceeded failure limit (>3). "
+                f"Discarding for this session."
+            )
 
     def find_email(
         self, first_name: str, last_name: str, domain: str
@@ -172,6 +256,9 @@ class HunterClient:
             }
             or None / {"found": False} if not found/error
         """
+        # Increment global attempt counter per email verification request
+        self.global_attempt_counter += 1
+
         if not domain:
             logger.debug("[Hunter] No domain provided")
             return None
@@ -191,9 +278,12 @@ class HunterClient:
 
         active_keys = self._get_active_keys_sorted()
         if not active_keys:
+            logger.warning(
+                f"[Hunter] No available keys for {first_name} {last_name} @ {domain}"
+            )
             return None
 
-        # Try each active key at most once for this person
+        # Try each eligible key at most once for this person
         for key_str, key_index, credits in active_keys:
             params = {
                 "api_key": key_str,
@@ -215,11 +305,9 @@ class HunterClient:
                 )
 
                 if resp.status_code == 429:
-                    logger.warning(
-                        f"[Hunter] Key {key_index + 1} rate limited, "
-                        "trying next key"
-                    )
-                    # Cool-off for this key; do not recurse, just try next key
+                    # Rate limited: record failure and set cooldown
+                    self._record_failure(key_index, is_rate_limit=True)
+                    # Try next key
                     continue
 
                 if resp.status_code == 400:
@@ -227,6 +315,7 @@ class HunterClient:
                         f"[Hunter] ❌ 400 Bad Request for {domain}: "
                         f"{resp.text[:300]}"
                     )
+                    self._record_failure(key_index, is_rate_limit=False)
                     continue
 
                 if resp.status_code not in (200, 201):
@@ -234,10 +323,10 @@ class HunterClient:
                         f"[Hunter] API error {resp.status_code} "
                         f"for {domain}: {resp.text[:200]}"
                     )
+                    self._record_failure(key_index, is_rate_limit=False)
                     continue
 
                 data = resp.json() or {}
-
                 if not data.get("data"):
                     logger.debug("[Hunter] No email found in Hunter response")
                     return {"found": False}
@@ -286,14 +375,19 @@ class HunterClient:
                     f"[Hunter] Request timeout for key {key_index + 1}, "
                     "trying next key"
                 )
+                self._record_failure(key_index, is_rate_limit=False)
                 continue
+
             except requests.exceptions.RequestException as e:
                 logger.warning(
                     f"[Hunter] Request failed for key {key_index + 1}: {e}"
                 )
+                self._record_failure(key_index, is_rate_limit=False)
                 continue
+
             except Exception as e:
                 logger.error(f"[Hunter] Unexpected error: {e}")
+                self._record_failure(key_index, is_rate_limit=False)
                 continue
 
         logger.error(
@@ -325,7 +419,6 @@ def run_enrichment() -> pd.DataFrame:
     # ========================================================================
     # STAGE 1: LOAD SCRAPED PROFILES
     # ========================================================================
-
     logger.info("📥 STAGE 1: LOAD SCRAPED PROFILES")
     logger.info("-" * 80)
 
@@ -355,7 +448,6 @@ def run_enrichment() -> pd.DataFrame:
     # ========================================================================
     # STAGE 2: INITIALIZE HUNTER.IO CLIENT
     # ========================================================================
-
     logger.info("🔑 STAGE 2: INITIALIZE HUNTER.IO CLIENT")
     logger.info("-" * 80)
 
@@ -369,6 +461,7 @@ def run_enrichment() -> pd.DataFrame:
 
     active_count = sum(1 for k in api_keys_config if k.get("status") == "active")
     logger.info(f"API Keys: {len(api_keys_config)} total, {active_count} active")
+
     for i, key_config in enumerate(api_keys_config, 1):
         status = key_config.get("status", "unknown")
         credits = key_config.get("credits", "?")
@@ -381,7 +474,6 @@ def run_enrichment() -> pd.DataFrame:
     # ========================================================================
     # STAGE 3: ENRICH WITH EMAILS
     # ========================================================================
-
     logger.info("📧 STAGE 3: FIND EMAILS VIA HUNTER.IO")
     logger.info("-" * 80)
 
@@ -399,6 +491,7 @@ def run_enrichment() -> pd.DataFrame:
     skipped_count = 0
     invalid_domain_count = 0
     invalid_name_count = 0
+    consecutive_failures = 0  # Track consecutive failures across all keys
 
     for idx, row in df.iterrows():
         # Already has email
@@ -408,9 +501,21 @@ def run_enrichment() -> pd.DataFrame:
             enriched_count += 1
             continue
 
+        # Check email cap
         if enriched_count >= email_cap:
             logger.info(
                 f"✅ Reached email cap ({email_cap}). Stopping enrichment."
+            )
+            break
+
+        # Check if all keys are exhausted for 10 consecutive attempts
+        if consecutive_failures >= 10:
+            logger.error(
+                "❌ All keys exhausted or rate-limited for 10 consecutive "
+                "email searches. Stopping enrichment."
+            )
+            logger.info(
+                "   Moving to sheet sync and next procedures..."
             )
             break
 
@@ -453,17 +558,30 @@ def run_enrichment() -> pd.DataFrame:
             df.at[idx, "email"] = email
             df.at[idx, "confidence"] = confidence
             enriched_count += 1
+            consecutive_failures = 0  # Reset consecutive failure counter
             logger.info(
                 f"  ✅ [{idx + 1}] {first_name} {last_name} → "
                 f"{email} ({confidence}%)"
             )
         else:
+            # Check if it's because no keys are available (all exhausted)
+            active_keys = client._get_active_keys_sorted()
+            if not active_keys:
+                consecutive_failures += 1
+                logger.warning(
+                    f"  ⚠️ [{idx + 1}] No available keys. "
+                    f"Consecutive failures: {consecutive_failures}/10"
+                )
+            else:
+                consecutive_failures = 0  # Reset if keys are available
+
             logger.debug(
                 f"  ❌ [{idx + 1}] {first_name} {last_name} @ {domain} "
                 f"- No email found"
             )
             skipped_count += 1
 
+        # Rate limiting courtesy delay
         time.sleep(0.5)
 
     logger.info("")
@@ -477,7 +595,6 @@ def run_enrichment() -> pd.DataFrame:
     # ========================================================================
     # STAGE 4: FILTER & EXPORT
     # ========================================================================
-
     logger.info("💾 STAGE 4: EXPORT ENRICHED PROFILES")
     logger.info("-" * 80)
 
@@ -488,15 +605,16 @@ def run_enrichment() -> pd.DataFrame:
     output_csv = Path(
         enr_cfg.get("output_csv", "data/enriched_with_emails.csv")
     )
-    output_csv.parent.mkdir(parents=True, exist_ok=True)
 
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
     df_with_emails.to_csv(output_csv, index=False)
+
     logger.info(
         f"✅ Exported {len(df_with_emails)} enriched profiles to {output_csv}"
     )
 
     if len(df_with_emails) == 0:
-        logger.warning("⚠️  No emails found. Sheet sync will skip.")
+        logger.warning("⚠️ No emails found. Sheet sync will skip.")
 
     logger.info("")
     logger.info("=" * 80)
@@ -506,6 +624,7 @@ def run_enrichment() -> pd.DataFrame:
     logger.info("=" * 80)
 
     return df_with_emails
+
 
 if __name__ == "__main__":
     run_enrichment()
