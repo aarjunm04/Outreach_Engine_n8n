@@ -18,9 +18,9 @@ import yaml
 from loguru import logger
 
 # Import modules
-from src.scraper import run_scraper
-from src.enrichment import run_enrichment
-from src.sheet_sync import SheetSync
+from scraper import run_scraper
+from enrichment import run_enrichment
+from sheet_sync import SheetSync
 
 
 # ============================================================================
