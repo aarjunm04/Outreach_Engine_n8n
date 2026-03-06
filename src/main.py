@@ -18,9 +18,9 @@ import yaml
 from loguru import logger
 
 # Import modules
-from scraper import run_scraper
-from enrichment import run_enrichment
-from sheet_sync import SheetSync
+from .scraper import run_scraper
+from .enrichment import run_enrichment
+from .sheet_sync import SheetSync
 
 
 # ============================================================================
@@ -127,7 +127,7 @@ def run_full_pipeline() -> bool:
     logger.info("-" * 80)
 
     # Get sheet sync config from settings
-    webhook_url = config.get("webhook_url")
+    webhook_url = config.get("google_sheets", {}).get("webhook_url")
 
     if not webhook_url:
         logger.error("❌ Missing 'webhook_url' in config/settings.yaml")
@@ -164,7 +164,7 @@ def run_full_pipeline() -> bool:
     )
     logger.info("║" + " " * 78 + "║")
     logger.info(
-        "║ Next: Opal workflow will send cold emails from Google Sheet"
+        "║ Next: n8n workflow will send cold emails from Google Sheet"
         + " " * 16
         + "║"
     )

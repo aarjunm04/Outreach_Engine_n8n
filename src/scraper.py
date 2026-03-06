@@ -7,7 +7,7 @@ Enterprise-grade LinkedIn scraper with:
 - Webshares proxy rotation
 - Deduplication against Google Sheet
 - 75%+ export rate (improved domain extraction)
-- 200 people limit distributed across queries
+- 400 people limit distributed across queries
 """
 
 import asyncio
@@ -64,6 +64,53 @@ def extract_name_from_title(title: str) -> Tuple[Optional[str], Optional[str]]:
         return parts[0], None
     
     return None, None
+
+def extract_role_and_company(title: str) -> Tuple[str, str]:
+    """
+    Extract job role and company from LinkedIn profile title.
+    Handles: "John Doe - CEO at Company" or "John Doe | VP Engineering"
+    Returns: (role, company)
+    """
+    role = ""
+    company = ""
+    if not title:
+        return role, company
+
+    # Split on common separators to get the part after the name
+    rest = ""
+    for sep in [" - ", " | ", " – ", " — "]:
+        if sep in title:
+            parts = title.split(sep, 1)
+            rest = parts[1].strip() if len(parts) > 1 else ""
+            break
+
+    if not rest:
+        return role, company
+
+    # Try to split role and company by "at" or "@"
+    if " at " in rest.lower():
+        split = re.split(r"\s+at\s+", rest, maxsplit=1, flags=re.IGNORECASE)
+        role = split[0].strip()
+        company = split[1].strip() if len(split) > 1 else ""
+    elif " @ " in rest:
+        split = rest.split(" @ ", 1)
+        role = split[0].strip()
+        company = split[1].strip() if len(split) > 1 else ""
+    else:
+        # No separator — the rest is likely a role or company
+        role = rest
+
+    # Clean up: truncate at commas, pipes, or parentheses
+    for field_val, setter in [(role, 'role'), (company, 'company')]:
+        cleaned = re.split(r'[,|·(]', field_val)[0].strip()
+        # Remove trailing dots/spaces/emojis
+        cleaned = re.sub(r'[.\s🚀👋🏽…]+$', '', cleaned).strip()
+        if setter == 'role':
+            role = cleaned
+        else:
+            company = cleaned
+
+    return role, company
 
 def extract_domain_from_link(link: str) -> Optional[str]:
     """
@@ -182,6 +229,7 @@ async def scrape_query(
                     
                     title = result.get("title", "")
                     first_name, last_name = extract_name_from_title(title)
+                    job_title, company = extract_role_and_company(title)
                     domain = extract_domain_from_link(link)
                     
                     if not domain:
@@ -192,6 +240,8 @@ async def scrape_query(
                         "last_name": last_name,
                         "linkedin_url": f"https://{domain}",
                         "title": title,
+                        "job_title": job_title,
+                        "company": company,
                         "source_query": query[:50]
                     })
                 
@@ -325,7 +375,7 @@ def run_scraper() -> pd.DataFrame:
     3. Dedupe by LinkedIn URL
     4. Dedupe against Google Sheet
     5. Export CSV
-    6. LIMIT TO 200 PEOPLE TOTAL
+    6. LIMIT TO 400 PEOPLE TOTAL
     """
     config = load_config()
     queries = load_queries()
@@ -347,8 +397,8 @@ def run_scraper() -> pd.DataFrame:
         logger.error("Missing 'serpapi_key' in config/settings.yaml")
         return pd.DataFrame()
     
-    # HARD LIMIT: 200 people total
-    TOTAL_PEOPLE_LIMIT = 200
+    # HARD LIMIT: 400 people total
+    TOTAL_PEOPLE_LIMIT = 400
     delay = config.get("scraping", {}).get("delay_between_requests", 2.0)
     
     # Scrape concurrently
@@ -375,7 +425,7 @@ def run_scraper() -> pd.DataFrame:
         logger.warning("⚠️  All profiles were duplicates")
         return df
     
-    # Export CSV
+    # Export CSV — single stable output file, no archives
     logger.info("")
     logger.info("💾 STAGE 3: EXPORT")
     logger.info("-" * 80)
@@ -383,10 +433,9 @@ def run_scraper() -> pd.DataFrame:
     output_dir = Path(__file__).parent.parent / "data"
     output_dir.mkdir(exist_ok=True)
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = output_dir / f"scraped_profiles_{timestamp}.csv"
-    
+    output_path = output_dir / "scraper_output.csv"
     df.to_csv(output_path, index=False)
+    
     logger.info(f"✅ Exported {len(df)} profiles → {output_path}")
     logger.info("")
     logger.info("=" * 80)

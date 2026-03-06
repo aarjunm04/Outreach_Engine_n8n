@@ -49,7 +49,7 @@ SHEET_COLUMNS = [
 # Columns owned by backend (safe to overwrite on resync)
 BACKEND_OWNED = {"NAME", "EMAIL", "ROLE", "COMPANY", "SOURCE", "DATE", "NOTES"}
 
-# Columns owned by outreach / Opal workflow (never overwrite here)
+# Columns owned by outreach / n8n workflow (never overwrite here)
 WORKFLOW_OWNED = {"STATUS", "TEMPLATE USED"}
 
 

@@ -243,10 +243,14 @@ class HunterClient:
             )
 
     def find_email(
-        self, first_name: str, last_name: str, domain: str
+        self, first_name: str, last_name: str, domain: str,
+        linkedin_url: str = ""
     ) -> Optional[Dict[str, Any]]:
         """
-        Find email for person at domain using Hunter.io API.
+        Find email for person using Hunter.io API.
+
+        Hunter.io accepts domain, company, or linkedin_url as identifier.
+        We pass linkedin_url when domain is not available (LinkedIn scraping).
 
         Returns:
             {
@@ -259,11 +263,11 @@ class HunterClient:
         # Increment global attempt counter per email verification request
         self.global_attempt_counter += 1
 
-        if not domain:
-            logger.debug("[Hunter] No domain provided")
+        if not domain and not linkedin_url:
+            logger.debug("[Hunter] No domain or linkedin_url provided")
             return None
 
-        if not self._validate_domain(domain):
+        if domain and not self._validate_domain(domain):
             logger.debug(f"[Hunter] Skipping invalid domain format: {domain}")
             return None
 
@@ -271,15 +275,16 @@ class HunterClient:
             logger.debug(f"[Hunter] Skipping - invalid last name: '{last_name}'")
             return None
 
-        domain_lower = domain.lower()
-        if any(domain_lower.endswith(bd) for bd in self.blacklist_domains):
-            logger.debug(f"[Hunter] Skipping blacklisted domain: {domain}")
-            return None
+        if domain:
+            domain_lower = domain.lower()
+            if any(domain_lower.endswith(bd) for bd in self.blacklist_domains):
+                logger.debug(f"[Hunter] Skipping blacklisted domain: {domain}")
+                return None
 
         active_keys = self._get_active_keys_sorted()
         if not active_keys:
             logger.warning(
-                f"[Hunter] No available keys for {first_name} {last_name} @ {domain}"
+                f"[Hunter] No available keys for {first_name} {last_name}"
             )
             return None
 
@@ -287,13 +292,25 @@ class HunterClient:
         for key_str, key_index, credits in active_keys:
             params = {
                 "api_key": key_str,
-                "domain": domain,
                 "first_name": first_name,
                 "last_name": last_name,
             }
 
+            # Use domain if available, otherwise use linkedin_handle
+            if domain:
+                params["domain"] = domain
+                identifier = domain
+            else:
+                # Extract just the handle from full URL
+                # e.g. "https://linkedin.com/in/ritesh-arora" -> "ritesh-arora"
+                handle = linkedin_url
+                if "/in/" in handle:
+                    handle = handle.split("/in/")[-1].strip("/")
+                params["linkedin_handle"] = handle
+                identifier = handle
+
             logger.info(
-                f"[Hunter] Searching: {first_name} {last_name} @ {domain} "
+                f"[Hunter] Searching: {first_name} {last_name} @ {identifier} "
                 f"(key {key_index + 1}, credits: {credits})"
             )
 
@@ -311,17 +328,23 @@ class HunterClient:
                     continue
 
                 if resp.status_code == 400:
-                    logger.error(
-                        f"[Hunter] ❌ 400 Bad Request for {domain}: "
-                        f"{resp.text[:300]}"
+                    logger.debug(
+                        f"[Hunter] 400 for {identifier}: "
+                        f"{resp.text[:200]}"
                     )
-                    self._record_failure(key_index, is_rate_limit=False)
-                    continue
+                    # 400 means bad params for this person, not a key issue
+                    return {"found": False}
 
                 if resp.status_code not in (200, 201):
+                    if resp.status_code == 404:
+                        # Profile not in Hunter's database
+                        logger.debug(
+                            f"[Hunter] Profile not found for {identifier}"
+                        )
+                        return {"found": False}
                     logger.warning(
                         f"[Hunter] API error {resp.status_code} "
-                        f"for {domain}: {resp.text[:200]}"
+                        f"for {identifier}: {resp.text[:200]}"
                     )
                     self._record_failure(key_index, is_rate_limit=False)
                     continue
@@ -522,8 +545,9 @@ def run_enrichment() -> pd.DataFrame:
         first_name = str(row.get("first_name", "")).strip()
         last_name = str(row.get("last_name", "")).strip()
         domain = str(row.get("domain", "")).strip()
+        linkedin_url = str(row.get("linkedin_url", "")).strip()
 
-        if not (first_name and last_name):
+        if not first_name or not last_name:
             logger.debug(
                 f"  [{idx + 1}] Skipping - missing name "
                 f"(name: {first_name} {last_name})"
@@ -531,12 +555,12 @@ def run_enrichment() -> pd.DataFrame:
             skipped_count += 1
             continue
 
-        if not domain:
-            logger.debug(f"  [{idx + 1}] Skipping - missing domain")
+        if not domain and not linkedin_url:
+            logger.debug(f"  [{idx + 1}] Skipping - no domain or linkedin_url")
             skipped_count += 1
             continue
 
-        if not client._validate_domain(domain):
+        if domain and not client._validate_domain(domain):
             logger.debug(
                 f"  [{idx + 1}] Skipping - invalid domain format: {domain}"
             )
@@ -550,7 +574,8 @@ def run_enrichment() -> pd.DataFrame:
             invalid_name_count += 1
             continue
 
-        result = client.find_email(first_name, last_name, domain)
+        # Use linkedin_url for Hunter.io lookup (domain is typically empty from scraper)
+        result = client.find_email(first_name, last_name, domain, linkedin_url)
 
         if result and result.get("found"):
             email = result["email"]
@@ -576,7 +601,7 @@ def run_enrichment() -> pd.DataFrame:
                 consecutive_failures = 0  # Reset if keys are available
 
             logger.debug(
-                f"  ❌ [{idx + 1}] {first_name} {last_name} @ {domain} "
+                f"  ❌ [{idx + 1}] {first_name} {last_name} "
                 f"- No email found"
             )
             skipped_count += 1
