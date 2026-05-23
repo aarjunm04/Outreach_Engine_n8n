@@ -36,3 +36,4 @@ settings.yaml
 .env
 Outreach_Engine.xlsx
 .contextual 
+.contextualignore
